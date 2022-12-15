@@ -1,4 +1,5 @@
 const User = require('../models/user.model.js');
+const sendEmail = require('../utils/sendEmailHandler');
 const asyncHandler = require('express-async-handler');
 const bcrypt = require('bcrypt');
 
@@ -109,4 +110,28 @@ const updateStatus = asyncHandler(async(req, res) => {
 })
 
 
-module.exports = { getAllUsers, updateUser, deleteUser, updateStatus};
+// @desc contact
+// @route POST /user/contact
+// @access private
+const contact = asyncHandler(async (req, res) => {
+    const { subject, message } = req.body;
+    const user = await User.findOne({email: req.body.email});
+    if (!user) {
+        return res.status(400).json({ message: "user not found, please sign up or log in first"});
+    }
+
+    if (!subject || !message ) {
+        return res.status(400).json({ message: "subject, message are required"})
+    }
+
+    const sent_from = user.email;
+    const sent_to = process.env.USER;
+    const reply_to = user.email;
+    
+    await sendEmail(subject, message, sent_from, sent_to, reply_to);
+    res.status(200).json({success: true, message: "message sent"});
+
+});
+
+
+module.exports = { getAllUsers, updateUser, deleteUser, updateStatus, contact};
