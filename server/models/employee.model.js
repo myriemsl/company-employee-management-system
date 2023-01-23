@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
-const userSchema =  mongoose.Schema({
+const employeeSchema =  new mongoose.Schema({
     fullname: {
         type: String,
     },
@@ -12,15 +12,11 @@ const userSchema =  mongoose.Schema({
         match: [/^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
         "pleaser enter a valid email"],
     },
-    username: {
-        type: String, 
-        required: true,
-    },
     password: {
         type : String, 
         required: true,
     },
-    isAdmin: {
+    isManager: {
         type: Boolean,
         default: false,
     },
@@ -31,12 +27,20 @@ const userSchema =  mongoose.Schema({
     isVerified: {
         type: Boolean,
         default: false,
-    }
+    },
+    departement: {
+        type : mongoose.Schema.Types.ObjectId, 
+        ref: 'Departement', 
+    },
+    leaves: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Leave",
+    }],
 }, { timestamps: true,})
 
 
 // encrypt password before saving to database
-userSchema.pre("save", async function (next) {
+employeeSchema.pre("save", async function (next) {
     if (!this.isModified("password")) {
         return next();
     }
@@ -47,4 +51,4 @@ userSchema.pre("save", async function (next) {
     next();
 })
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('Employee', employeeSchema);

@@ -1,4 +1,4 @@
-const User = require('../models/user.model.js');
+const Employee = require('../models/employee.model.js');
 const Token = require('../models/token.model.js');
 const sendEmail = require('../utils/sendEmailHandler.js');
 const bcrypt = require('bcrypt');
@@ -11,49 +11,37 @@ const crypto = require('crypto');
 // @route POST /register
 // @access public
 const register = asyncHandler(async (req, res) => {
-    const {fullname, email, username, password, isAdmin, isActive} = req.body;
-    
-    // confirm data
-    if (!email || !username || !password) {
-        return res.status(400).json({message: 'all files are required'})
-    }
-
-    // check for duplicate
-    /// check username
-    const checkUsername = await User.findOne({ username }).lean().exec()
-    if (checkUsername) {
-        return res.status(409).json({ message: 'username taken'})
-    }
-    /// check email
-    const checkEmail = await User.findOne({ email }).lean().exec()
+   const { email } = req.body;
+    // check for duplicate email
+    const checkEmail = await Employee.findOne({ email }).lean().exec()
     if (checkEmail) {
         return res.status(409).json({ message: 'email already registered'})
     }
     
-    const newUser = new User ({
+    const newEmployee = new Employee ({
         ...req.body,
     })
-    await newUser.save();
+    await newEmployee.save();
 
     let token = await new Token({
-        userId: newUser._id,
+        employeeId: newEmployee._id,
         token: crypto.randomBytes(32).toString('hex'),
         createdAt: Date.now(),
         expiresAt: Date.now() + 30 * (60 * 1000),
     }).save();
 
-    const url = `${process.env.BASE_URL}/user/verify/${newUser.id}/${token.token}`;
+    const url = `${process.env.BASE_URL}/employee/verify/${newEmployee.id}/${token.token}`;
    
     const subject = "verify email";
     const message = `
-    <h3>Hello ${newUser.username}</h3>
+    <h3>Hello</h3>
     <p>click on the link below to verify your email</p>
     <a href=${url} clicktracking=off>${url}</a>
     <p>this link is valid only for 30 minutes.</p>
     `;
 
-    const sent_to = newUser.email;
-    const sent_from = process.env.USER;
+    const sent_to = process.env.USER ;
+    const sent_from = newEmployee.email;
     await sendEmail(subject, message, sent_to, sent_from);
     res.status(200).json({success: true, message: "verification link sent to your email"});
 })
@@ -64,20 +52,20 @@ const register = asyncHandler(async (req, res) => {
 // @route GET /user/verify/:id/:token
 // @access public
 const verify = asyncHandler(async (req, res) => {
-    const newUser = await User.findOne({_id: req.params.id});
-    if(!newUser) return res.status(400).json({message: 'not found'});
+    const newEmployee = await Employee.findOne({_id: req.params.id});
+    if(!newEmployee) return res.status(400).json({message: 'not found'});
 
     const token = await Token.findOne({
-        userId: newUser._id,
+        employeeId: newEmployee._id,
         token: req.params.token,
     });
 
     if (!token) return res.status(400).json({message: 'invalid link'});
-    await User.updateOne(
-         { _id: newUser.id },
+    await Employee.updateOne(
+         { _id: newEmployee.id },
          { $set: { isVerified: true }}
         );
-        await Token.findByIdAndRemove(token.userId);
+        await Token.findByIdAndRemove(token.employeeId);
         res.send("email verified successfully");
 });
 
@@ -86,34 +74,32 @@ const verify = asyncHandler(async (req, res) => {
 // @route POST /login
 // @access public
 const login = asyncHandler(async (req, res) => {
-    const { username, password } = req.body
-    if (!username || !password ) {
+    const { email, password } = req.body
+    if (!email || !password ) {
         return res.status(400).json({ message: 'all fields are required' })
     }
     
-    const user = await User.findOne({ username }).exec()
-    if (!user) {
+    const employee = await Employee.findOne({ email }).exec()
+    if (!employee) {
         return res.status(401).json({message: 'please register first'})
     }
 
-    const matchedPassword = await bcrypt.compare(password, user.password)
+    const matchedPassword = await bcrypt.compare(password, employee.password)
     if (!matchedPassword) {
         return res.status(401).json({ message: 'wrong password'})
     }
 
     const accessToken = jwt.sign(
-        {id: user._id, isAdmin: user.isAdmin},
+        {id: employee._id, isManager: employee.isManager},
         process.env.ACCESS_TOKEN_SECRET,
         { expiresIn: "1h"}
     );
 
-
     const refrechToken = jwt.sign(
-        {id: user._id},
+        {id: employee._id},
         process.env.REFRESH_TOKEN_SECRET,
         {expiresIn: '1d'}
     )
-
 
     // create secure cookie with refresh token
     res.cookie('jwt', refrechToken, {
@@ -144,12 +130,12 @@ const refrech = (req, res) => {
         asyncHandler(async (err) => {
             if (err) return res.status(403).json({ message: 'forbidden '})
 
-            const user = await User.findOne({ id: req.params.id }).exec()
+            const employee = await Employee.findOne({ id: req.params.id }).exec()
 
-            if(!user) return res.status(401).json({ message: 'unauthorized' })
+            if(!employee) return res.status(401).json({ message: 'unauthorized' })
 
             const accessToken = jwt.sign(
-                {id: user._id, isAdmin: user.isAdmin},
+                {id: employee._id, isManager: employee.isManager},
                 process.env.ACCESS_TOKEN_SECRET, 
                 { expiresIn: "1h"}
             );
@@ -184,23 +170,23 @@ const logout = asyncHandler(async (req, res) => {
 // @access public
 const forgotPassword = asyncHandler(async (req, res) => {
     const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) {
-        return res.status(404).json({message: 'user not found'});
+    const employee = await Employee.findOne({ email });
+    if (!employee) {
+        return res.status(404).json({message: 'employee not found'});
     }
 
-    let token = await Token.findOne({ userId: user._id });
+    let token = await Token.findOne({ employeeId: employee._id });
     if (token) {
         await token.deleteOne();
     }
 
-    let resetToken = crypto.randomBytes(32).toString('hex') + user._id;
+    let resetToken = crypto.randomBytes(32).toString('hex') + employee._id;
     console.log(resetToken);
 
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
 
     await new Token({
-        userId: user._id,
+        employeeId: employee._id,
         token: hashedToken,
         createdAt: Date.now(),
         expiresAt: Date.now() + 30 * (60 * 1000),
@@ -210,14 +196,14 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     const subject = "reset password";
     const message = `
-    <h3>Hello ${user.username}</h3>
+    <h3>Hello</h3>
     <p>click on the link below to reset your password</p>
     <a href=${resetURL} clicktracking=off>${resetURL}</a>
     <p>this link is valid only for 30 minutes.</p>
     `;
 
-    const sent_to = user.email;
-    const sent_from = process.env.USER;
+    const sent_to =  process.env.USER;
+    const sent_from = employee.email;
     await sendEmail(subject, message, sent_to, sent_from);
     res.status(200).json({success: true, message: "reset password link sent to your email"});
 
@@ -242,9 +228,9 @@ const resetPassword = asyncHandler(async (req, res) => {
         return res.status(404).json({message: 'invalid or expired link'})
     }
 
-    const user = await User.findOne({ _id: token.userId });
-    user.password = password;
-    await user.save();
+    const employee = await Employee.findOne({ _id: token.employeeId });
+    employee.password = password;
+    await employee.save();
     res.status(200).json({success: true, message: 'password successfully updated, please login'});
 
 });

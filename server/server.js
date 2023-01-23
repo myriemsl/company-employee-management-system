@@ -26,10 +26,13 @@ app.use(cors());
 
 // define routes
 app.use('/', require('./routes/auth.routes'));
-app.use('/', require('./routes/user.routes'));
+app.use('/', require('./routes/employee.routes'));
+app.use('/', require('./routes/company.routes'));
+app.use('/', require('./routes/departement.routes'));
+app.use('/', require('./routes/leave.routes'));
 
 // custom errors detecting middleware
-app.use(errorHandler)
+ app.use(errorHandler)
 
 // running server
 mongoose.connection.once('open', () => {

@@ -9,16 +9,16 @@ const verifyToken = (req, res, next) => {
 
     jwt.verify(accessToken,
          process.env.ACCESS_TOKEN_SECRET,
-          (err, user) => {
+          (err, employee) => {
         if (err) return res.status(401).json({message :' Invalid Token'})
-        req.user = user;
+        req.employee = employee;
         next()
     })
 }
 
-const verifyUser = (req, res, next) => {
+const verifyEmployee = (req, res, next) => {
     verifyToken(req, res, () => {
-        if(req.user.id === req.params.id || req.user.username || req.user.isAdmin){
+        if(req.employee.id === req.params.id || req.employee.isManager){
             next()
         } else {
             return res.status(403).json({message: 'Not Authorized!'})
@@ -26,9 +26,9 @@ const verifyUser = (req, res, next) => {
     });
 };
 
-const verifyAdmin = (req, res, next) => {
+const verifyManager = (req, res, next) => {
     verifyToken(req, res, () => {
-        if(req.user.isAdmin){
+        if(req.employee.isManager){
             next()
         } else {
             return res.status(403).json({message: 'Not Authorized!'})
@@ -40,4 +40,4 @@ const verifyAdmin = (req, res, next) => {
 
 
 
-module.exports = { verifyToken, verifyUser, verifyAdmin };
+module.exports = { verifyToken, verifyEmployee, verifyManager };
